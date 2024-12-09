@@ -1,7 +1,8 @@
 /* eslint-disable react-native/no-inline-styles */
 import React, {useRef} from 'react';
 import {View, Button, StyleSheet, Text} from 'react-native';
-import BottomSheet, {BottomSheetRef} from './BottomSheet';
+import {BottomSheetRef} from './BottomSheet';
+import ReanimatedBottomsheet from './ReanimatedBottomsheet';
 
 const App = () => {
   const bottomSheetRef = useRef<BottomSheetRef>(null);
@@ -16,16 +17,16 @@ const App = () => {
         title="Close BottomSheet"
         onPress={() => bottomSheetRef?.current?.close()}
       />
-      <BottomSheet ref={bottomSheetRef}>
+      <ReanimatedBottomsheet ref={bottomSheetRef}>
         <View style={{height: 'auto'}}>
           <Text>Scrollable Content</Text>
-          {[...Array(5)].map((_, index) => (
+          {[...Array(60)].map((_, index) => (
             <Text key={index} style={styles.item}>
               Item {index + 1}
             </Text>
           ))}
         </View>
-      </BottomSheet>
+      </ReanimatedBottomsheet>
     </View>
   );
 };
