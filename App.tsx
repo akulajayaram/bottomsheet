@@ -20,10 +20,10 @@ const App = () => {
       <ReanimatedBottomsheet ref={bottomSheetRef}>
         <View style={{height: 'auto'}}>
           <Text>Scrollable Content</Text>
-          {[...Array(60)].map((_, index) => (
-            <Text key={index} style={styles.item}>
-              Item {index + 1}
-            </Text>
+          {[...Array(14)].map((_, index) => (
+            <View key={index} style={{height: 80}}>
+              <Text style={styles.item}>Item {index + 1}</Text>
+            </View>
           ))}
         </View>
       </ReanimatedBottomsheet>
