@@ -1,3 +1,4 @@
+/* eslint-disable react-native/no-inline-styles */
 import React, {
   useRef,
   forwardRef,
@@ -10,7 +11,6 @@ import {
   Gesture,
   GestureDetector,
   GestureHandlerRootView,
-  TouchableWithoutFeedback,
 } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedScrollHandler,
@@ -48,7 +48,7 @@ const ReanimatedBottomsheet = forwardRef<
         SCREEN_HEIGHT / 2,
         SCREEN_HEIGHT * 0.6,
         SCREEN_HEIGHT * 0.8,
-        SCREEN_HEIGHT * 0.9,
+        SCREEN_HEIGHT * 0.95,
       ],
     },
     ref,
@@ -110,6 +110,7 @@ const ReanimatedBottomsheet = forwardRef<
         () => {
           'worklet';
           currentTranslateY.current = SCREEN_HEIGHT;
+          paddingBottom.value = 0;
           runOnJS(setIsVisible)(false);
         },
       );
@@ -146,7 +147,10 @@ const ReanimatedBottomsheet = forwardRef<
       };
     });
 
-    const panhandler = Gesture.Pan()
+    const tapHandler = Gesture.Tap().onEnd(() => {
+      runOnJS(close)();
+    });
+    const panHandler = Gesture.Pan()
       .onBegin(() => {
         gestureStartY.value = translateY.value;
       })
@@ -168,6 +172,7 @@ const ReanimatedBottomsheet = forwardRef<
           snapToNearestPoint();
         }
       });
+    const combinedHandler = Gesture.Exclusive(panHandler, tapHandler);
 
     const contentContainerStyle = useAnimatedStyle(() => {
       return {
@@ -186,6 +191,19 @@ const ReanimatedBottomsheet = forwardRef<
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [contentHeight]);
 
+    const overlayStyle = useAnimatedStyle(() => {
+      const progress = (SCREEN_HEIGHT - translateY.value) / SCREEN_HEIGHT;
+      return {
+        backgroundColor: `rgba(0, 0, 0, ${Math.min(progress, 0.5)})`,
+        opacity: progress,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+      };
+    });
+
     return (
       <Modal
         visible={isVisible}
@@ -194,24 +212,29 @@ const ReanimatedBottomsheet = forwardRef<
         onRequestClose={close}>
         <GestureHandlerRootView style={styles.modalContainer}>
           {/* Overlay */}
-          <TouchableWithoutFeedback onPress={close} style={{}}>
-            <View style={styles.overlay} />
-          </TouchableWithoutFeedback>
-
+          <GestureDetector gesture={combinedHandler}>
+            <Animated.View style={[overlayStyle, styles.overlay]} />
+          </GestureDetector>
           {/* Bottom Sheet */}
-          <Animated.View style={[styles.container, bottomSheetStyle]}>
-            <GestureDetector gesture={panhandler}>
-              <Animated.View>
-                <View style={styles.handle} />
-              </Animated.View>
-            </GestureDetector>
-            <Animated.ScrollView
-              onScroll={scrollHandler}
-              onContentSizeChange={handleContentLayout}
-              contentContainerStyle={contentContainerStyle}>
-              {children}
-            </Animated.ScrollView>
-          </Animated.View>
+          <GestureHandlerRootView style={styles.modalContainer}>
+            <Animated.View
+              style={[
+                styles.container,
+                bottomSheetStyle,
+                contentContainerStyle,
+              ]}>
+              <GestureDetector gesture={panHandler}>
+                <Animated.View style={{height: 20}}>
+                  <View style={styles.handle} />
+                </Animated.View>
+              </GestureDetector>
+              <Animated.ScrollView
+                onScroll={scrollHandler}
+                onContentSizeChange={handleContentLayout}>
+                {children}
+              </Animated.ScrollView>
+            </Animated.View>
+          </GestureHandlerRootView>
         </GestureHandlerRootView>
       </Modal>
     );
@@ -225,20 +248,19 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
+
   container: {
     width: '100%',
     height: SCREEN_HEIGHT,
     backgroundColor: '#fff',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: -2},
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
   },
   handle: {
     width: 50,
