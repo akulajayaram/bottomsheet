@@ -195,7 +195,7 @@ const ReanimatedBottomsheet = forwardRef<
       const progress = (SCREEN_HEIGHT - translateY.value) / SCREEN_HEIGHT;
       return {
         backgroundColor: `rgba(0, 0, 0, ${Math.min(progress, 0.5)})`,
-        opacity: progress,
+        opacity: progress * 2,
         position: 'absolute',
         top: 0,
         left: 0,
