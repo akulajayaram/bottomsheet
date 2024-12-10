@@ -104,7 +104,7 @@ const ReanimatedBottomsheet = forwardRef<
       translateY.value = withTiming(
         SCREEN_HEIGHT,
         {
-          duration: 300,
+          duration: 500,
           easing: Easing.out(Easing.cubic),
         },
         () => {
@@ -158,8 +158,15 @@ const ReanimatedBottomsheet = forwardRef<
         );
         paddingBottom.value = Math.max(translateY.value, 0) + 20;
       })
-      .onFinalize(() => {
-        snapToNearestPoint();
+      .onFinalize(event => {
+        const isMovingDown = event.translationY > 0;
+        const isFastMovement = Math.abs(event.velocityY) > 1000;
+
+        if (isMovingDown && isFastMovement) {
+          runOnJS(close)();
+        } else {
+          snapToNearestPoint();
+        }
       });
 
     const contentContainerStyle = useAnimatedStyle(() => {
@@ -176,7 +183,7 @@ const ReanimatedBottomsheet = forwardRef<
       if (contentHeight > 0) {
         open();
       }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [contentHeight]);
 
     return (
