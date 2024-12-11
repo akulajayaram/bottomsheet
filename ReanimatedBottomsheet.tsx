@@ -1,6 +1,6 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable react-native/no-inline-styles */
 import React, {
-  useRef,
   forwardRef,
   useImperativeHandle,
   useState,
@@ -17,8 +17,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withTiming,
-  Easing,
   runOnJS,
 } from 'react-native-reanimated';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -59,12 +57,13 @@ const ReanimatedBottomsheet = forwardRef<
     const gestureStartY = useSharedValue(0);
     const scrollOffset = useSharedValue(0);
     const paddingBottom = useSharedValue(20);
-    const currentTranslateY = useRef(SCREEN_HEIGHT);
+    const isBottomSheetOpened = useSharedValue(false);
 
     const [isVisible, setIsVisible] = useState(false);
     const [contentHeight, setContentHeight] = useState(0);
 
     const scrollHandler = useAnimatedScrollHandler(event => {
+      'worklet';
       scrollOffset.value = event.contentOffset.y;
     });
 
@@ -74,8 +73,11 @@ const ReanimatedBottomsheet = forwardRef<
         return;
       }
 
+      if (isBottomSheetOpened.value) {
+        return;
+      }
+
       let targetSnapPoint: number;
-      runOnJS(setIsVisible)(true);
 
       if (snapIndex === -1) {
         const closestIndex = snapPoints.reduce((prevIndex, curr, index) => {
@@ -90,33 +92,32 @@ const ReanimatedBottomsheet = forwardRef<
         targetSnapPoint = snapPoints[snapIndex] || snapPoints[0];
       }
 
+      isBottomSheetOpened.value = true;
+
+      translateY.value = withSpring(SCREEN_HEIGHT - targetSnapPoint, {
+        damping: 15,
+        stiffness: 100,
+        mass: 1,
+      });
+    };
+
+    const close = () => {
+      'worklet';
       translateY.value = withSpring(
-        SCREEN_HEIGHT - targetSnapPoint,
+        SCREEN_HEIGHT,
         {
           damping: 15,
           stiffness: 100,
           mass: 1,
         },
         () => {
-          currentTranslateY.current = SCREEN_HEIGHT - targetSnapPoint;
-        },
-      );
-    };
-    const close = () => {
-      translateY.value = withTiming(
-        SCREEN_HEIGHT,
-        {
-          duration: 500,
-          easing: Easing.out(Easing.cubic),
-        },
-        () => {
-          'worklet';
-          currentTranslateY.current = SCREEN_HEIGHT;
-          paddingBottom.value = 0;
           runOnJS(setIsVisible)(false);
+          runOnJS(setContentHeight)(0);
+          isBottomSheetOpened.value = false;
         },
       );
     };
+
     useImperativeHandle(ref, () => ({
       present: open,
       close,
@@ -130,35 +131,30 @@ const ReanimatedBottomsheet = forwardRef<
       const closestIndex = distances.indexOf(Math.min(...distances));
 
       if (snapPoints[closestIndex] === 0) {
-        runOnJS(close)();
+        close();
       } else {
-        translateY.value = withSpring(
-          SCREEN_HEIGHT - snapPoints[closestIndex],
-          {},
-          () => {
-            currentTranslateY.current =
-              SCREEN_HEIGHT - snapPoints[closestIndex];
-          },
-        );
+        translateY.value = withSpring(SCREEN_HEIGHT - snapPoints[closestIndex]);
       }
     };
 
     const bottomSheetStyle = useAnimatedStyle(() => {
-      const top = translateY.value;
+      'worklet';
       return {
-        top,
+        top: translateY.value,
       };
     });
 
     const tapHandler = Gesture.Tap().onEnd(() => {
-      runOnJS(close)();
+      close();
     });
 
     const panHandler = Gesture.Pan()
       .onBegin(() => {
+        'worklet';
         gestureStartY.value = translateY.value;
       })
       .onChange(event => {
+        'worklet';
         const newTranslateY = gestureStartY.value + event.translationY;
         translateY.value = Math.max(
           Math.min(newTranslateY, SCREEN_HEIGHT),
@@ -167,29 +163,41 @@ const ReanimatedBottomsheet = forwardRef<
         paddingBottom.value = Math.max(translateY.value, 0) + 20;
       })
       .onFinalize(event => {
+        'worklet';
         const isMovingDown = event.translationY > 0;
         const isFastMovement = Math.abs(event.velocityY) > 1000;
 
         if (isMovingDown && isFastMovement) {
-          runOnJS(close)();
+          close();
         } else {
           snapToNearestPoint();
         }
       });
+
     const combinedHandler = Gesture.Exclusive(panHandler, tapHandler);
 
     const handleContentLayout = (_: number, height: number) => {
-      runOnJS(setContentHeight)(height);
+      if (!isVisible) {
+        return;
+      }
+      if (contentHeight !== height) {
+        runOnJS(setContentHeight)(height);
+      }
     };
 
     useEffect(() => {
-      if (contentHeight > 0) {
-        open();
+      if (contentHeight <= 0) {
+        return;
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      const timer = setTimeout(() => {
+        runOnJS(open)();
+      }, 300);
+
+      return () => clearTimeout(timer);
     }, [contentHeight]);
 
     const overlayStyle = useAnimatedStyle(() => {
+      'worklet';
       const progress = (SCREEN_HEIGHT - translateY.value) / SCREEN_HEIGHT;
       return {
         backgroundColor: `rgba(0, 0, 0, ${Math.min(progress, 0.5)})`,
@@ -246,7 +254,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-
   container: {
     backgroundColor: '#fff',
     ...StyleSheet.absoluteFillObject,
