@@ -190,6 +190,7 @@ const ReanimatedBottomsheet = forwardRef<
         return;
       }
       const timer = setTimeout(() => {
+        isBottomSheetOpened.value = false;
         runOnJS(open)();
       }, 300);
 
