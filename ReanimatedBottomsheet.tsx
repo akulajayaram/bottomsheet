@@ -21,6 +21,7 @@ import Animated, {
   Easing,
   runOnJS,
 } from 'react-native-reanimated';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 const {height: SCREEN_HEIGHT} = Dimensions.get('window');
 
@@ -53,6 +54,7 @@ const ReanimatedBottomsheet = forwardRef<
     },
     ref,
   ) => {
+    const inset = useSafeAreaInsets();
     const translateY = useSharedValue(SCREEN_HEIGHT);
     const gestureStartY = useSharedValue(0);
     const scrollOffset = useSharedValue(0);
@@ -142,14 +144,16 @@ const ReanimatedBottomsheet = forwardRef<
     };
 
     const bottomSheetStyle = useAnimatedStyle(() => {
+      const top = translateY.value;
       return {
-        transform: [{translateY: translateY.value}],
+        top,
       };
     });
 
     const tapHandler = Gesture.Tap().onEnd(() => {
       runOnJS(close)();
     });
+
     const panHandler = Gesture.Pan()
       .onBegin(() => {
         gestureStartY.value = translateY.value;
@@ -173,12 +177,6 @@ const ReanimatedBottomsheet = forwardRef<
         }
       });
     const combinedHandler = Gesture.Exclusive(panHandler, tapHandler);
-
-    const contentContainerStyle = useAnimatedStyle(() => {
-      return {
-        paddingBottom: paddingBottom.value,
-      };
-    });
 
     const handleContentLayout = (_: number, height: number) => {
       runOnJS(setContentHeight)(height);
@@ -210,31 +208,30 @@ const ReanimatedBottomsheet = forwardRef<
         transparent
         animationType="none"
         onRequestClose={close}>
-        <GestureHandlerRootView style={styles.modalContainer}>
+        <GestureHandlerRootView>
           {/* Overlay */}
           <GestureDetector gesture={combinedHandler}>
             <Animated.View style={[overlayStyle, styles.overlay]} />
           </GestureDetector>
+
           {/* Bottom Sheet */}
-          <GestureHandlerRootView style={styles.modalContainer}>
-            <Animated.View
-              style={[
-                styles.container,
-                bottomSheetStyle,
-                contentContainerStyle,
-              ]}>
-              <GestureDetector gesture={panHandler}>
-                <Animated.View style={{height: 20}}>
-                  <View style={styles.handle} />
-                </Animated.View>
-              </GestureDetector>
-              <Animated.ScrollView
-                onScroll={scrollHandler}
-                onContentSizeChange={handleContentLayout}>
-                {children}
-              </Animated.ScrollView>
-            </Animated.View>
-          </GestureHandlerRootView>
+          <Animated.View
+            style={[
+              styles.container,
+              bottomSheetStyle,
+              {paddingBottom: inset.bottom},
+            ]}>
+            <GestureDetector gesture={panHandler}>
+              <Animated.View style={{height: 20}}>
+                <View style={styles.handle} />
+              </Animated.View>
+            </GestureDetector>
+            <Animated.ScrollView
+              onScroll={scrollHandler}
+              onContentSizeChange={handleContentLayout}>
+              {children}
+            </Animated.ScrollView>
+          </Animated.View>
         </GestureHandlerRootView>
       </Modal>
     );
@@ -242,11 +239,6 @@ const ReanimatedBottomsheet = forwardRef<
 );
 
 const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-    height: SCREEN_HEIGHT,
-    justifyContent: 'flex-end',
-  },
   overlay: {
     position: 'absolute',
     top: 0,
@@ -256,11 +248,10 @@ const styles = StyleSheet.create({
   },
 
   container: {
-    width: '100%',
-    height: SCREEN_HEIGHT,
     backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    ...StyleSheet.absoluteFillObject,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   handle: {
     width: 50,
