@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable react-native/no-inline-styles */
 import React, {
   forwardRef,
@@ -6,7 +5,15 @@ import React, {
   useState,
   useEffect,
 } from 'react';
-import {View, StyleSheet, Dimensions, Modal} from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Dimensions,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
+} from 'react-native';
 import {
   Gesture,
   GestureDetector,
@@ -16,8 +23,9 @@ import Animated, {
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
+  withTiming,
   runOnJS,
+  useDerivedValue,
 } from 'react-native-reanimated';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
@@ -56,11 +64,17 @@ const ReanimatedBottomsheet = forwardRef<
     const translateY = useSharedValue(SCREEN_HEIGHT);
     const gestureStartY = useSharedValue(0);
     const scrollOffset = useSharedValue(0);
-    const paddingBottom = useSharedValue(20);
     const isBottomSheetOpened = useSharedValue(false);
-
+    const isBottomSheetOpening = useSharedValue(false);
+    const isVisibleState = useSharedValue(false);
     const [isVisible, setIsVisible] = useState(false);
     const [contentHeight, setContentHeight] = useState(0);
+    const [originalPosition, setOriginalPosition] =
+      useState<number>(SCREEN_HEIGHT);
+
+    useDerivedValue(() => {
+      runOnJS(setIsVisible)(isVisibleState.value);
+    }, [isVisibleState]);
 
     const scrollHandler = useAnimatedScrollHandler(event => {
       'worklet';
@@ -69,10 +83,10 @@ const ReanimatedBottomsheet = forwardRef<
 
     const open = (snapIndex = -1) => {
       if (contentHeight === 0) {
-        setIsVisible(true);
+        isBottomSheetOpening.value = true;
+        isVisibleState.set(true);
         return;
       }
-
       if (isBottomSheetOpened.value) {
         return;
       }
@@ -94,28 +108,19 @@ const ReanimatedBottomsheet = forwardRef<
 
       isBottomSheetOpened.value = true;
 
-      translateY.value = withSpring(SCREEN_HEIGHT - targetSnapPoint, {
-        damping: 15,
-        stiffness: 100,
-        mass: 1,
+      translateY.value = withTiming(SCREEN_HEIGHT - targetSnapPoint, {}, () => {
+        isBottomSheetOpening.value = false;
       });
+      setOriginalPosition(SCREEN_HEIGHT - targetSnapPoint);
     };
 
     const close = () => {
       'worklet';
-      translateY.value = withSpring(
-        SCREEN_HEIGHT,
-        {
-          damping: 15,
-          stiffness: 100,
-          mass: 1,
-        },
-        () => {
-          runOnJS(setIsVisible)(false);
-          runOnJS(setContentHeight)(0);
-          isBottomSheetOpened.value = false;
-        },
-      );
+      translateY.value = withTiming(SCREEN_HEIGHT, {}, () => {
+        isVisibleState.set(false);
+        runOnJS(setContentHeight)(0);
+        isBottomSheetOpened.value = false;
+      });
     };
 
     useImperativeHandle(ref, () => ({
@@ -133,7 +138,7 @@ const ReanimatedBottomsheet = forwardRef<
       if (snapPoints[closestIndex] === 0) {
         close();
       } else {
-        translateY.value = withSpring(SCREEN_HEIGHT - snapPoints[closestIndex]);
+        translateY.value = withTiming(SCREEN_HEIGHT - snapPoints[closestIndex]);
       }
     };
 
@@ -160,9 +165,8 @@ const ReanimatedBottomsheet = forwardRef<
           Math.min(newTranslateY, SCREEN_HEIGHT),
           SCREEN_HEIGHT - snapPoints[snapPoints.length - 1],
         );
-        paddingBottom.value = Math.max(translateY.value, 0) + 20;
       })
-      .onFinalize(event => {
+      .onEnd(event => {
         'worklet';
         const isMovingDown = event.translationY > 0;
         const isFastMovement = Math.abs(event.velocityY) > 1000;
@@ -177,9 +181,10 @@ const ReanimatedBottomsheet = forwardRef<
     const combinedHandler = Gesture.Exclusive(panHandler, tapHandler);
 
     const handleContentLayout = (_: number, height: number) => {
-      if (!isVisible) {
+      if (!isVisibleState.value || isBottomSheetOpened.value) {
         return;
       }
+
       if (contentHeight !== height) {
         runOnJS(setContentHeight)(height);
       }
@@ -189,12 +194,20 @@ const ReanimatedBottomsheet = forwardRef<
       if (contentHeight <= 0) {
         return;
       }
+
       const timer = setTimeout(() => {
-        isBottomSheetOpened.value = false;
+        'worklet';
+        // if (isBottomSheetOpening) {
+        //   return;
+        // }
+        if (isBottomSheetOpened.value) {
+          isBottomSheetOpened.value = false;
+        }
         runOnJS(open)();
-      }, 300);
+      }, 200);
 
       return () => clearTimeout(timer);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [contentHeight]);
 
     const overlayStyle = useAnimatedStyle(() => {
@@ -210,6 +223,41 @@ const ReanimatedBottomsheet = forwardRef<
         bottom: 0,
       };
     });
+    const keyboardDidHide = () => {
+      translateY.value = withTiming(originalPosition, {duration: 300});
+    };
+
+    useEffect(() => {
+      const keyboardDidShow = (event: {endCoordinates: {height: any}}) => {
+        const keyboardHeight = event.endCoordinates.height;
+
+        const currentBottomSheetTop =
+          SCREEN_HEIGHT - translateY.value - contentHeight;
+
+        if (currentBottomSheetTop < keyboardHeight) {
+          const adjustment = keyboardHeight - currentBottomSheetTop;
+
+          translateY.value = withTiming(translateY.value - adjustment, {
+            duration: 300,
+          });
+        }
+      };
+
+      const showSubscription = Keyboard.addListener(
+        'keyboardDidShow',
+        keyboardDidShow,
+      );
+      const hideSubscription = Keyboard.addListener(
+        'keyboardDidHide',
+        keyboardDidHide,
+      );
+
+      return () => {
+        showSubscription.remove();
+        hideSubscription.remove();
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [translateY, snapToNearestPoint, contentHeight]);
 
     return (
       <Modal
@@ -218,29 +266,35 @@ const ReanimatedBottomsheet = forwardRef<
         animationType="none"
         onRequestClose={close}>
         <GestureHandlerRootView>
-          {/* Overlay */}
-          <GestureDetector gesture={combinedHandler}>
-            <Animated.View style={[overlayStyle, styles.overlay]} />
-          </GestureDetector>
-
-          {/* Bottom Sheet */}
-          <Animated.View
-            style={[
-              styles.container,
-              bottomSheetStyle,
-              {paddingBottom: inset.bottom},
-            ]}>
-            <GestureDetector gesture={panHandler}>
-              <Animated.View style={{height: 20}}>
-                <View style={styles.handle} />
-              </Animated.View>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{flex: 1}}>
+            {/* Overlay */}
+            <GestureDetector gesture={combinedHandler}>
+              <Animated.View style={[overlayStyle, styles.overlay]} />
             </GestureDetector>
-            <Animated.ScrollView
-              onScroll={scrollHandler}
-              onContentSizeChange={handleContentLayout}>
-              {children}
-            </Animated.ScrollView>
-          </Animated.View>
+
+            {/* Bottom Sheet */}
+            <Animated.View
+              style={[
+                styles.container,
+                bottomSheetStyle,
+                {paddingBottom: inset.bottom},
+              ]}>
+              <GestureDetector gesture={panHandler}>
+                <Animated.View style={{height: 20}}>
+                  <View style={styles.handle} />
+                </Animated.View>
+              </GestureDetector>
+              <Animated.ScrollView
+                onScroll={scrollHandler}
+                scrollEventThrottle={100}
+                automaticallyAdjustKeyboardInsets
+                onContentSizeChange={handleContentLayout}>
+                {children}
+              </Animated.ScrollView>
+            </Animated.View>
+          </KeyboardAvoidingView>
         </GestureHandlerRootView>
       </Modal>
     );
@@ -249,6 +303,8 @@ const ReanimatedBottomsheet = forwardRef<
 
 const styles = StyleSheet.create({
   overlay: {
+    flex: 1,
+    justifyContent: 'flex-start',
     position: 'absolute',
     top: 0,
     left: 0,
@@ -256,8 +312,10 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   container: {
+    flex: 1,
+    justifyContent: 'flex-start',
     backgroundColor: '#fff',
-    ...StyleSheet.absoluteFillObject,
+    // ...StyleSheet.absoluteFillObject,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
