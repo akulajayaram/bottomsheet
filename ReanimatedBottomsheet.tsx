@@ -28,6 +28,8 @@ import Animated, {
   useDerivedValue,
 } from 'react-native-reanimated';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {colors} from '../../constants';
+import {heightPixel, pixelSizeVertical} from '../../utils';
 
 const {height: SCREEN_HEIGHT} = Dimensions.get('window');
 
@@ -67,20 +69,31 @@ const ReanimatedBottomsheet = forwardRef<
     const isBottomSheetOpened = useSharedValue(false);
     const isBottomSheetOpening = useSharedValue(false);
     const isVisibleState = useSharedValue(false);
+    const scrollBegin = useSharedValue(0);
+    const isScrollEnabled = useSharedValue(true);
+
     const [isVisible, setIsVisible] = useState(false);
     const [contentHeight, setContentHeight] = useState(0);
     const [originalPosition, setOriginalPosition] =
       useState<number>(SCREEN_HEIGHT);
+    const [scrollEnabled, setScrollEnabled] = useState(true);
 
     useDerivedValue(() => {
       runOnJS(setIsVisible)(isVisibleState.value);
     }, [isVisibleState]);
 
-    const scrollHandler = useAnimatedScrollHandler(event => {
-      'worklet';
-      scrollOffset.value = event.contentOffset.y;
-    });
+    useDerivedValue(() => {
+      runOnJS(setScrollEnabled)(isScrollEnabled.value);
+    }, [isScrollEnabled]);
 
+    const scrollHandler = useAnimatedScrollHandler({
+      onBeginDrag: event => {
+        scrollBegin.value = event.contentOffset.y;
+      },
+      onScroll: event => {
+        scrollOffset.value = event.contentOffset.y;
+      },
+    });
     const open = (snapIndex = -1) => {
       if (contentHeight === 0) {
         isBottomSheetOpening.value = true;
@@ -149,17 +162,19 @@ const ReanimatedBottomsheet = forwardRef<
       };
     });
 
-    const tapHandler = Gesture.Tap().onEnd(() => {
-      close();
-    });
+    const tapHandler = Gesture.Tap()
+      .onBegin(() => {})
+      .onEnd(() => {
+        close();
+      });
 
-    const panHandler = Gesture.Pan()
+    const panHandler2 = Gesture.Pan()
       .onBegin(() => {
-        'worklet';
+        ('worklet');
         gestureStartY.value = translateY.value;
       })
       .onChange(event => {
-        'worklet';
+        ('worklet');
         const newTranslateY = gestureStartY.value + event.translationY;
         translateY.value = Math.max(
           Math.min(newTranslateY, SCREEN_HEIGHT),
@@ -167,7 +182,7 @@ const ReanimatedBottomsheet = forwardRef<
         );
       })
       .onEnd(event => {
-        'worklet';
+        ('worklet');
         const isMovingDown = event.translationY > 0;
         const isFastMovement = Math.abs(event.velocityY) > 1000;
 
@@ -178,7 +193,60 @@ const ReanimatedBottomsheet = forwardRef<
         }
       });
 
-    const combinedHandler = Gesture.Exclusive(panHandler, tapHandler);
+    const scrollPanHandler = Gesture.Pan()
+      .onBegin(() => {
+        ('worklet');
+        gestureStartY.value = translateY.value;
+      })
+      .onChange(event => {
+        ('worklet');
+
+        if (
+          (scrollOffset.value === 0 && event.translationY > 0) ||
+          contentHeight < SCREEN_HEIGHT
+        ) {
+          isScrollEnabled.value = false;
+          const newTranslateY =
+            gestureStartY.value + event.translationY - scrollBegin.value;
+          translateY.value = Math.max(
+            Math.min(newTranslateY, SCREEN_HEIGHT),
+            SCREEN_HEIGHT - snapPoints[snapPoints.length - 1],
+          );
+        }
+      })
+      .onEnd(event => {
+        ('worklet');
+        isScrollEnabled.value = true;
+        snapToNearestPoint();
+      });
+
+    const panHandler = Gesture.Pan()
+      .onBegin(() => {
+        ('worklet');
+        gestureStartY.value = translateY.value;
+      })
+      .onChange(event => {
+        ('worklet');
+        const newTranslateY = gestureStartY.value + event.translationY;
+        translateY.value = Math.max(
+          Math.min(newTranslateY, SCREEN_HEIGHT),
+          SCREEN_HEIGHT - snapPoints[snapPoints.length - 1],
+        );
+      })
+      .onEnd(event => {
+        ('worklet');
+        const isMovingDown = event.translationY > 0;
+        const isFastMovement = Math.abs(event.velocityY) > 1000;
+
+        if (isMovingDown && isFastMovement) {
+          close();
+        } else {
+          snapToNearestPoint();
+        }
+      });
+
+    const combinedHandler = Gesture.Simultaneous(panHandler2, tapHandler);
+    const scrollViewGesture = Gesture.Native();
 
     const handleContentLayout = (_: number, height: number) => {
       if (!isVisibleState.value || isBottomSheetOpened.value) {
@@ -197,9 +265,6 @@ const ReanimatedBottomsheet = forwardRef<
 
       const timer = setTimeout(() => {
         'worklet';
-        // if (isBottomSheetOpening) {
-        //   return;
-        // }
         if (isBottomSheetOpened.value) {
           isBottomSheetOpened.value = false;
         }
@@ -282,17 +347,27 @@ const ReanimatedBottomsheet = forwardRef<
                 {paddingBottom: inset.bottom},
               ]}>
               <GestureDetector gesture={panHandler}>
-                <Animated.View style={{height: 20}}>
+                <Animated.View style={{height: heightPixel(25)}}>
                   <View style={styles.handle} />
                 </Animated.View>
               </GestureDetector>
-              <Animated.ScrollView
-                onScroll={scrollHandler}
-                scrollEventThrottle={100}
-                automaticallyAdjustKeyboardInsets
-                onContentSizeChange={handleContentLayout}>
-                {children}
-              </Animated.ScrollView>
+
+              <GestureDetector
+                gesture={Gesture.Simultaneous(
+                  scrollViewGesture,
+                  scrollPanHandler,
+                )}>
+                <Animated.ScrollView
+                  onScroll={scrollHandler}
+                  scrollEnabled={scrollEnabled}
+                  contentContainerStyle={{
+                    paddingBottom:
+                      contentHeight > SCREEN_HEIGHT ? pixelSizeVertical(50) : 0,
+                  }}
+                  onContentSizeChange={handleContentLayout}>
+                  {children}
+                </Animated.ScrollView>
+              </GestureDetector>
             </Animated.View>
           </KeyboardAvoidingView>
         </GestureHandlerRootView>
@@ -303,8 +378,7 @@ const ReanimatedBottomsheet = forwardRef<
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
-    justifyContent: 'flex-start',
+    // flex: 1,
     position: 'absolute',
     top: 0,
     left: 0,
@@ -313,7 +387,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    justifyContent: 'flex-start',
     backgroundColor: '#fff',
     // ...StyleSheet.absoluteFillObject,
     borderTopLeftRadius: 20,
@@ -322,7 +395,7 @@ const styles = StyleSheet.create({
   handle: {
     width: 50,
     height: 5,
-    backgroundColor: 'pink',
+    backgroundColor: colors.Gray60Color,
     borderRadius: 2.5,
     alignSelf: 'center',
     marginVertical: 10,
