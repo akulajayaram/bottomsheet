@@ -51,7 +51,6 @@ const ReanimatedBottomsheet = forwardRef<
   const translateY = useSharedValue(SCREEN_HEIGHT);
   const gestureStartY = useSharedValue(0);
   const scrollOffset = useSharedValue(0);
-  const isBottomSheetOpened = useSharedValue(false);
   const isVisibleState = useSharedValue(false);
   const scrollBegin = useSharedValue(0);
   const isScrollEnabled = useSharedValue(true);
@@ -84,10 +83,6 @@ const ReanimatedBottomsheet = forwardRef<
       isVisibleState.set(true);
       return;
     }
-    if (isBottomSheetOpened.value) {
-      return;
-    }
-    isBottomSheetOpened.value = true;
 
     if (contentHeight >= SCREEN_HEIGHT * 0.9) {
       translateY.value = withTiming(SCREEN_HEIGHT * 0.1);
@@ -103,7 +98,6 @@ const ReanimatedBottomsheet = forwardRef<
     translateY.value = withTiming(SCREEN_HEIGHT, {}, () => {
       isVisibleState.set(false);
       runOnJS(setContentHeight)(0);
-      isBottomSheetOpened.value = false;
     });
   };
 
@@ -191,17 +185,13 @@ const ReanimatedBottomsheet = forwardRef<
         isScrollEnabled.value = false;
         const newTranslateY =
           gestureStartY.value + event.translationY - scrollBegin.value;
-        console.log(
+
+        const finalTranslateY = Math.max(
           Math.min(newTranslateY, SCREEN_HEIGHT),
           SCREEN_HEIGHT - contentHeight,
-          SCREEN_HEIGHT,
-          'SCREEN_HEIGHT',
         );
 
-        translateY.value = Math.max(
-          Math.min(newTranslateY, SCREEN_HEIGHT),
-          SCREEN_HEIGHT - contentHeight,
-        );
+        translateY.value = finalTranslateY < 0 ? 0 : finalTranslateY;
       }
     })
     .onEnd(() => {
@@ -240,27 +230,18 @@ const ReanimatedBottomsheet = forwardRef<
   const scrollViewGesture = Gesture.Native();
 
   const handleContentLayout = (_: number, height: number) => {
-    // if (!isVisibleState.value || isBottomSheetOpened.value) {
-    //   return;
-    // }
-
-    // if (contentHeight !== height) {
-    runOnJS(setContentHeight)(height + heightPixel(60));
-    // }
+    if (contentHeight !== height) {
+      runOnJS(setContentHeight)(height + heightPixel(60));
+    }
   };
 
   useEffect(() => {
-    console.log(contentHeight, 'contentttttttttttttt');
-
     if (contentHeight <= 0) {
       return;
     }
 
     const timer = setTimeout(() => {
       'worklet';
-      if (isBottomSheetOpened.value) {
-        isBottomSheetOpened.value = false;
-      }
       runOnJS(open)();
     }, 200);
 
