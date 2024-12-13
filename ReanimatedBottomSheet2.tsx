@@ -1,328 +1,385 @@
-import {Dimensions, Modal, StyleSheet, View} from 'react-native';
+/* eslint-disable react-native/no-inline-styles */
 import React, {
   forwardRef,
   useImperativeHandle,
-  useCallback,
   useState,
   useEffect,
 } from 'react';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  useAnimatedScrollHandler,
-  AnimatedScrollViewProps,
-  runOnJS,
-} from 'react-native-reanimated';
+import {
+  View,
+  StyleSheet,
+  Dimensions,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
+} from 'react-native';
 import {
   Gesture,
   GestureDetector,
   GestureHandlerRootView,
 } from 'react-native-gesture-handler';
-import BackDrop from './BackDrop';
+import Animated, {
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  runOnJS,
+  useDerivedValue,
+} from 'react-native-reanimated';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {colors} from '../../constants';
+import {heightPixel, pixelSizeVertical} from '../../utils';
 
-interface Props extends AnimatedScrollViewProps {
+const {height: SCREEN_HEIGHT} = Dimensions.get('window');
+
+type ReanimatedBottomsheetProps = {
+  children: React.ReactNode;
   snapPoints?: number[];
-  backgroundColor: string;
-  backDropColor: string;
-}
+};
 
-export interface BottomSheetMethods {
+export type ReanimatedBottomsheetRef = {
   present: () => void;
   close: () => void;
-}
-const {height: closeHeight} = Dimensions.get('screen');
+};
 
-const BottomSheetScrollView = forwardRef<BottomSheetMethods, Props>(
-  (
-    {
-      snapPoints = [
-        0,
-        closeHeight / 4,
-        closeHeight / 3,
-        closeHeight / 2,
-        closeHeight * 0.6,
-        closeHeight * 0.8,
-        closeHeight * 0.95,
-      ],
-      children,
-      backgroundColor = 'white',
-      backDropColor = 'black',
-      ...rest
-    }: Props,
-    ref,
-  ) => {
-    const inset = useSafeAreaInsets();
+const ReanimatedBottomsheet = forwardRef<
+  ReanimatedBottomsheetRef,
+  ReanimatedBottomsheetProps
+>(({children}, ref) => {
+  const inset = useSafeAreaInsets();
+  const translateY = useSharedValue(SCREEN_HEIGHT);
+  const gestureStartY = useSharedValue(0);
+  const scrollOffset = useSharedValue(0);
+  const isBottomSheetOpened = useSharedValue(false);
+  const isVisibleState = useSharedValue(false);
+  const scrollBegin = useSharedValue(0);
+  const isScrollEnabled = useSharedValue(true);
 
-    // const percentage = parseFloat(snapTo.replace('%', '')) / 100;
-    // const [openHeight, setOpenHeight] = useState(0);
+  const [isVisible, setIsVisible] = useState(false);
+  const [contentHeight, setContentHeight] = useState(0);
+  const [originalPosition, setOriginalPosition] =
+    useState<number>(SCREEN_HEIGHT);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
 
-    const topAnimation = useSharedValue(closeHeight);
-    const context = useSharedValue(0);
-    const scrollBegin = useSharedValue(0);
-    const scrollY = useSharedValue(0);
-    const snapToIndex = useSharedValue(0);
-    const [enableScroll, setEnableScroll] = useState(true);
-    const [isVisible, setIsVisible] = useState(false);
-    const [openHeight, setOpenHeight] = useState(0);
+  useDerivedValue(() => {
+    runOnJS(setIsVisible)(isVisibleState.value);
+  }, [isVisibleState]);
 
-    const open = useCallback(
-      (snapIndex = -1) => {
-        'worklet';
-        snapToIndex.value = snapIndex;
-        if (openHeight === 0) {
-          setIsVisible(true);
-          return;
-        }
+  useDerivedValue(() => {
+    runOnJS(setScrollEnabled)(isScrollEnabled.value);
+  }, [isScrollEnabled]);
 
-        let targetSnapPoint: number;
-        runOnJS(setIsVisible)(true);
+  const scrollHandler = useAnimatedScrollHandler({
+    onBeginDrag: event => {
+      scrollBegin.value = event.contentOffset.y;
+    },
+    onScroll: event => {
+      scrollOffset.value = event.contentOffset.y;
+    },
+  });
 
-        if (snapIndex === -1) {
-          const closestIndex = snapPoints.reduce((prevIndex, curr, index) => {
-            const prevDistance = Math.abs(openHeight - snapPoints[prevIndex]);
-            const currDistance = Math.abs(openHeight - curr);
-            return currDistance < prevDistance ? index : prevIndex;
-          }, 0);
+  const open = () => {
+    if (contentHeight === 0) {
+      isVisibleState.set(true);
+      return;
+    }
+    if (isBottomSheetOpened.value) {
+      return;
+    }
+    isBottomSheetOpened.value = true;
 
-          targetSnapPoint =
-            snapPoints[closestIndex + 1] || snapPoints[closestIndex];
-        } else {
-          targetSnapPoint = snapPoints[snapIndex] || snapPoints[0];
-        }
+    if (contentHeight >= SCREEN_HEIGHT * 0.9) {
+      translateY.value = withTiming(SCREEN_HEIGHT * 0.1);
+      setOriginalPosition(SCREEN_HEIGHT * 0.1);
+    } else {
+      translateY.value = withTiming(SCREEN_HEIGHT - contentHeight);
+      setOriginalPosition(SCREEN_HEIGHT - contentHeight);
+    }
+  };
 
-        topAnimation.value = withSpring(closeHeight - targetSnapPoint, {
-          damping: 15,
-          stiffness: 100,
-          mass: 1,
-        });
-      },
-      [openHeight, topAnimation],
-    );
+  const close = () => {
+    'worklet';
+    translateY.value = withTiming(SCREEN_HEIGHT, {}, () => {
+      isVisibleState.set(false);
+      runOnJS(setContentHeight)(0);
+      isBottomSheetOpened.value = false;
+    });
+  };
 
-    const close = useCallback(() => {
-      'worklet';
-      topAnimation.value = withSpring(
-        closeHeight,
-        {
-          damping: 15,
-          stiffness: 100,
-          mass: 1,
-        },
-        () => {
-          'worklet';
-          runOnJS(setIsVisible)(false);
-        },
-      );
-    }, [closeHeight, topAnimation]);
+  useImperativeHandle(ref, () => ({
+    present: open,
+    close,
+  }));
 
-    useImperativeHandle(
-      ref,
-      () => ({
-        present: open,
-        close,
-      }),
-      [open, close],
-    );
+  const snapToNearestPoint = () => {
+    'worklet';
+    const threshholdValue =
+      SCREEN_HEIGHT < contentHeight ? SCREEN_HEIGHT * 0.9 : contentHeight;
 
-    const animationStyle = useAnimatedStyle(() => {
-      const top = topAnimation.value;
-      return {
-        top,
-      };
+    if (SCREEN_HEIGHT - translateY.value < threshholdValue * 0.7) {
+      close();
+    } else {
+      translateY.value = withTiming(SCREEN_HEIGHT - threshholdValue);
+    }
+  };
+
+  const bottomSheetStyle = useAnimatedStyle(() => {
+    'worklet';
+    return {
+      top: translateY.value,
+    };
+  });
+
+  const overlayStyle = useAnimatedStyle(() => {
+    'worklet';
+    const progress = (SCREEN_HEIGHT - translateY.value) / SCREEN_HEIGHT;
+    return {
+      backgroundColor: `rgba(0, 0, 0, ${Math.min(progress, 0.5)})`,
+      opacity: progress * 2,
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+    };
+  });
+
+  const tapHandler = Gesture.Tap()
+    .onBegin(() => {})
+    .onEnd(() => {
+      close();
     });
 
-    const snapToNearestPoint = () => {
-      'worklet';
-      const distances = snapPoints.map(point =>
-        Math.abs(topAnimation.value - (closeHeight - point)),
+  const overlayPanHandler = Gesture.Pan()
+    .onBegin(() => {
+      ('worklet');
+      gestureStartY.value = translateY.value;
+    })
+    .onChange(event => {
+      ('worklet');
+      const newTranslateY = gestureStartY.value + event.translationY;
+      translateY.value = Math.max(
+        Math.min(newTranslateY, SCREEN_HEIGHT),
+        SCREEN_HEIGHT - contentHeight,
       );
-      const closestIndex = distances.indexOf(Math.min(...distances));
+    })
+    .onEnd(event => {
+      ('worklet');
+      const isMovingDown = event.translationY > 0;
+      const isFastMovement = Math.abs(event.velocityY) > 1000;
 
-      if (snapPoints[closestIndex] === 0) {
-        runOnJS(close)();
+      if (isMovingDown && isFastMovement) {
+        close();
       } else {
-        topAnimation.value = withSpring(closeHeight - snapPoints[closestIndex]);
+        snapToNearestPoint();
       }
-    };
-
-    const pan = Gesture.Pan()
-      .onBegin(() => {
-        context.value = topAnimation.value;
-      })
-      .onUpdate(event => {
-        console.log('111111111111111');
-
-        // if (event.translationY < 0) {
-        //   topAnimation.value = withSpring(openHeight, {
-        //     // damping: 100,
-        //     // stiffness: 400,
-        //     damping: 15,
-        //     stiffness: 100,
-        //     mass: 1,
-        //   });
-        // } else {
-        //   topAnimation.value = withSpring(context.value + event.translationY, {
-        //     // damping: 100,
-        //     // stiffness: 400,
-        //     damping: 15,
-        //     stiffness: 100,
-        //     mass: 1,
-        //   });
-        // }
-        const newTranslateY = context.value + event.translationY;
-        topAnimation.value = Math.max(
-          Math.min(newTranslateY, closeHeight),
-          closeHeight - snapPoints[snapPoints.length - 1],
-        );
-      })
-      .onEnd(event => {
-        const isMovingDown = event.translationY > 0;
-        const isFastMovement = Math.abs(event.velocityY) > 1000;
-
-        if (isMovingDown && isFastMovement) {
-          runOnJS(close)();
-        } else {
-          snapToNearestPoint();
-        }
-      });
-
-    const onScroll = useAnimatedScrollHandler({
-      onBeginDrag: event => {
-        scrollBegin.value = event.contentOffset.y;
-      },
-      onScroll: event => {
-        scrollY.value = event.contentOffset.y;
-      },
     });
 
-    const panScroll = Gesture.Pan()
-      .onBegin(() => {
-        context.value = topAnimation.value;
-      })
-      .onUpdate(event => {
-        if (event.translationY < 0) {
-          topAnimation.value = withSpring(openHeight, {
-            // damping: 100,
-            // stiffness: 400,
-            damping: 15,
-            stiffness: 100,
-            mass: 1,
-          });
-        } else if (event.translationY > 0 && scrollY.value === 0) {
-          runOnJS(setEnableScroll)(false);
-          topAnimation.value = withSpring(
-            Math.max(
-              context.value + event.translationY - scrollBegin.value,
-              openHeight,
-            ),
-            {
-              damping: 100,
-              stiffness: 400,
-            },
-          );
-        }
-      })
-      .onEnd(() => {
-        runOnJS(setEnableScroll)(true);
-        if (topAnimation.value > openHeight + 50) {
-          topAnimation.value = withSpring(closeHeight, {
-            // damping: 100,
-            // stiffness: 400,
-            damping: 15,
-            stiffness: 100,
-            mass: 1,
-          });
-        } else {
-          topAnimation.value = withSpring(openHeight, {
-            // damping: 100,
-            // stiffness: 400,
-            damping: 15,
-            stiffness: 100,
-            mass: 1,
-          });
-        }
-      });
+  const scrollPanHandler = Gesture.Pan()
+    .onBegin(() => {
+      ('worklet');
+      gestureStartY.value = translateY.value;
+    })
+    .onChange(event => {
+      ('worklet');
 
-    const scrollViewGesture = Gesture.Native();
+      if (
+        (scrollOffset.value === 0 && event.translationY > 0) ||
+        contentHeight < SCREEN_HEIGHT
+      ) {
+        isScrollEnabled.value = false;
+        const newTranslateY =
+          gestureStartY.value + event.translationY - scrollBegin.value;
+        console.log(
+          Math.min(newTranslateY, SCREEN_HEIGHT),
+          SCREEN_HEIGHT - contentHeight,
+          SCREEN_HEIGHT,
+          'SCREEN_HEIGHT',
+        );
 
-    const handleContentLayout = (_: number, height: number) => {
-      runOnJS(setOpenHeight)(height);
+        translateY.value = Math.max(
+          Math.min(newTranslateY, SCREEN_HEIGHT),
+          SCREEN_HEIGHT - contentHeight,
+        );
+      }
+    })
+    .onEnd(() => {
+      ('worklet');
+      if (!isScrollEnabled.value) {
+        snapToNearestPoint();
+      }
+      isScrollEnabled.value = true;
+    });
+
+  const panHandler = Gesture.Pan()
+    .onBegin(() => {
+      ('worklet');
+      gestureStartY.value = translateY.value;
+    })
+    .onChange(event => {
+      ('worklet');
+      const newTranslateY = gestureStartY.value + event.translationY;
+      translateY.value = Math.max(
+        Math.min(newTranslateY, SCREEN_HEIGHT),
+        SCREEN_HEIGHT - contentHeight,
+      );
+    })
+    .onEnd(event => {
+      ('worklet');
+      const isMovingDown = event.translationY > 0;
+      const isFastMovement = Math.abs(event.velocityY) > 1000;
+
+      if (isMovingDown && isFastMovement) {
+        close();
+      } else {
+        snapToNearestPoint();
+      }
+    });
+
+  const scrollViewGesture = Gesture.Native();
+
+  const handleContentLayout = (_: number, height: number) => {
+    // if (!isVisibleState.value || isBottomSheetOpened.value) {
+    //   return;
+    // }
+
+    // if (contentHeight !== height) {
+    runOnJS(setContentHeight)(height + heightPixel(60));
+    // }
+  };
+
+  useEffect(() => {
+    console.log(contentHeight, 'contentttttttttttttt');
+
+    if (contentHeight <= 0) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      'worklet';
+      if (isBottomSheetOpened.value) {
+        isBottomSheetOpened.value = false;
+      }
+      runOnJS(open)();
+    }, 200);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contentHeight]);
+
+  const keyboardDidHide = () => {
+    translateY.value = withTiming(originalPosition, {duration: 300});
+  };
+
+  useEffect(() => {
+    const keyboardDidShow = (event: {endCoordinates: {height: any}}) => {
+      const keyboardHeight = event.endCoordinates.height;
+
+      const currentBottomSheetTop =
+        SCREEN_HEIGHT - translateY.value - contentHeight;
+
+      if (currentBottomSheetTop < keyboardHeight) {
+        const adjustment = keyboardHeight - currentBottomSheetTop;
+
+        translateY.value = withTiming(translateY.value - adjustment, {
+          duration: 300,
+        });
+      }
     };
 
-    useEffect(() => {
-      if (openHeight > 0) {
-        open(snapToIndex.value);
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [openHeight]);
+    const showSubscription = Keyboard.addListener(
+      'keyboardDidShow',
+      keyboardDidShow,
+    );
+    const hideSubscription = Keyboard.addListener(
+      'keyboardDidHide',
+      keyboardDidHide,
+    );
 
-    return (
-      <Modal
-        visible={isVisible}
-        transparent
-        animationType="none"
-        onRequestClose={close}>
-        <GestureHandlerRootView>
-          <BackDrop
-            topAnimation={topAnimation}
-            backDropColor={backDropColor}
-            closeHeight={closeHeight}
-            openHeight={openHeight}
-            close={close}
-          />
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [translateY, snapToNearestPoint, contentHeight]);
+
+  return (
+    <Modal
+      visible={isVisible}
+      transparent
+      animationType="none"
+      onRequestClose={close}>
+      <GestureHandlerRootView>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{flex: 1}}>
+          {/* Overlay */}
+          <GestureDetector
+            gesture={Gesture.Exclusive(overlayPanHandler, tapHandler)}>
+            <Animated.View style={[overlayStyle, styles.overlay]} />
+          </GestureDetector>
+
+          {/* Bottom Sheet */}
           <Animated.View
             style={[
               styles.container,
-              animationStyle,
-              {
-                backgroundColor: backgroundColor,
-                paddingBottom: inset.bottom,
-              },
+              bottomSheetStyle,
+              {paddingBottom: inset.bottom},
             ]}>
-            <GestureDetector gesture={pan}>
-              <View style={styles.lineContainer}>
-                <View style={styles.line} />
-              </View>
+            <GestureDetector gesture={panHandler}>
+              <Animated.View style={{height: heightPixel(25)}}>
+                <View style={styles.handle} />
+              </Animated.View>
             </GestureDetector>
-            <GestureDetector gesture={Gesture.Simultaneous(scrollViewGesture)}>
+
+            <GestureDetector
+              gesture={Gesture.Simultaneous(
+                scrollViewGesture,
+                scrollPanHandler,
+              )}>
               <Animated.ScrollView
-                {...rest}
-                scrollEnabled={enableScroll}
-                bounces={false}
-                scrollEventThrottle={16}
-                onContentSizeChange={handleContentLayout}
-                onScroll={onScroll}>
+                onScroll={scrollHandler}
+                scrollEnabled={scrollEnabled}
+                contentContainerStyle={{
+                  paddingBottom:
+                    contentHeight > SCREEN_HEIGHT ? pixelSizeVertical(90) : 0,
+                }}
+                onContentSizeChange={handleContentLayout}>
                 {children}
               </Animated.ScrollView>
             </GestureDetector>
           </Animated.View>
-        </GestureHandlerRootView>
-      </Modal>
-    );
-  },
-);
-
-export default BottomSheetScrollView;
+        </KeyboardAvoidingView>
+      </GestureHandlerRootView>
+    </Modal>
+  );
+});
 
 const styles = StyleSheet.create({
+  overlay: {
+    // flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   container: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
+    backgroundColor: '#fff',
+    // ...StyleSheet.absoluteFillObject,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
-  lineContainer: {
-    alignItems: 'center',
-    height: 20,
-  },
-  line: {
+  handle: {
     width: 50,
-    height: 4,
-    backgroundColor: 'black',
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    height: 5,
+    backgroundColor: colors.Gray60Color,
+    borderRadius: 2.5,
+    alignSelf: 'center',
+    marginVertical: 10,
   },
 });
+
+export default ReanimatedBottomsheet;
