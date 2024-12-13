@@ -54,6 +54,7 @@ const ReanimatedBottomsheet = forwardRef<
   const isVisibleState = useSharedValue(false);
   const scrollBegin = useSharedValue(0);
   const isScrollEnabled = useSharedValue(true);
+  const isKeyboardOpen = useSharedValue(false);
 
   const [isVisible, setIsVisible] = useState(false);
   const [contentHeight, setContentHeight] = useState(0);
@@ -96,7 +97,8 @@ const ReanimatedBottomsheet = forwardRef<
   const close = () => {
     'worklet';
     translateY.value = withTiming(SCREEN_HEIGHT, {}, () => {
-      isVisibleState.set(false);
+      isVisibleState.value = false;
+      scrollBegin.value = 0;
       runOnJS(setContentHeight)(0);
     });
   };
@@ -214,6 +216,12 @@ const ReanimatedBottomsheet = forwardRef<
         Math.min(newTranslateY, SCREEN_HEIGHT),
         SCREEN_HEIGHT - contentHeight,
       );
+      const finalTranslateY = Math.max(
+        Math.min(newTranslateY, SCREEN_HEIGHT),
+        SCREEN_HEIGHT - contentHeight,
+      );
+
+      translateY.value = finalTranslateY < 0 ? 0 : finalTranslateY;
     })
     .onEnd(event => {
       ('worklet');
@@ -230,7 +238,7 @@ const ReanimatedBottomsheet = forwardRef<
   const scrollViewGesture = Gesture.Native();
 
   const handleContentLayout = (_: number, height: number) => {
-    if (contentHeight !== height) {
+    if (contentHeight !== height && !isKeyboardOpen.value) {
       runOnJS(setContentHeight)(height + heightPixel(60));
     }
   };
@@ -250,12 +258,14 @@ const ReanimatedBottomsheet = forwardRef<
   }, [contentHeight]);
 
   const keyboardDidHide = () => {
+    isKeyboardOpen.value = false;
     translateY.value = withTiming(originalPosition, {duration: 300});
   };
 
   useEffect(() => {
     const keyboardDidShow = (event: {endCoordinates: {height: any}}) => {
       const keyboardHeight = event.endCoordinates.height;
+      isKeyboardOpen.value = true;
 
       const currentBottomSheetTop =
         SCREEN_HEIGHT - translateY.value - contentHeight;
