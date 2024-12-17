@@ -28,8 +28,8 @@ import Animated, {
   useDerivedValue,
 } from 'react-native-reanimated';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {colors} from '../../constants';
-import {heightPixel, pixelSizeVertical} from '../../utils';
+// import {colors} from '../../constants';
+// import {heightPixel, pixelSizeVertical} from '../../utils';
 
 const {height: SCREEN_HEIGHT} = Dimensions.get('window');
 
@@ -239,7 +239,7 @@ const ReanimatedBottomsheet = forwardRef<
 
   const handleContentLayout = (_: number, height: number) => {
     if (contentHeight !== height && !isKeyboardOpen.value) {
-      runOnJS(setContentHeight)(height + heightPixel(60));
+      runOnJS(setContentHeight)(height + 60);
     }
   };
 
@@ -319,7 +319,7 @@ const ReanimatedBottomsheet = forwardRef<
               {paddingBottom: inset.bottom},
             ]}>
             <GestureDetector gesture={panHandler}>
-              <Animated.View style={{height: heightPixel(25)}}>
+              <Animated.View style={{height: 25}}>
                 <View style={styles.handle} />
               </Animated.View>
             </GestureDetector>
@@ -333,8 +333,7 @@ const ReanimatedBottomsheet = forwardRef<
                 onScroll={scrollHandler}
                 scrollEnabled={scrollEnabled}
                 contentContainerStyle={{
-                  paddingBottom:
-                    contentHeight > SCREEN_HEIGHT ? pixelSizeVertical(90) : 0,
+                  paddingBottom: contentHeight > SCREEN_HEIGHT ? 90 : 0,
                 }}
                 onContentSizeChange={handleContentLayout}>
                 {children}
@@ -366,7 +365,7 @@ const styles = StyleSheet.create({
   handle: {
     width: 50,
     height: 5,
-    backgroundColor: colors.Gray60Color,
+    backgroundColor: '#999999',
     borderRadius: 2.5,
     alignSelf: 'center',
     marginVertical: 10,
