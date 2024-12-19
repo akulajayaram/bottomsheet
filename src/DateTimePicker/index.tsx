@@ -1,4 +1,5 @@
-import React, {useMemo} from 'react';
+/* eslint-disable react-native/no-inline-styles */
+import React, {useMemo, useEffect, useRef} from 'react';
 import {Text, StyleSheet, Dimensions, View} from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -7,75 +8,65 @@ import Animated, {
   Extrapolation,
   useSharedValue,
   useAnimatedScrollHandler,
-  withTiming,
 } from 'react-native-reanimated';
 
 const {height} = Dimensions.get('window');
-const ITEM_HEIGHT = 50; // Height of each item
+const ITEM_HEIGHT = 40; // Height of each item
 const VISIBLE_ITEMS = 5; // Total visible items
 
 const RenderItem: React.FC<{
   item: string | number;
   index: number;
   scrollValue: SharedValue<number>;
-  contentHeight: SharedValue<number>;
-}> = ({item, index, scrollValue}) => {
-  const animatedStyle = useAnimatedStyle(() => {
-    'worklet';
-
+}> = React.memo(({item, index, scrollValue}) => {
+  const animatedTextStyle = useAnimatedStyle(() => {
     const scrollOffset = scrollValue.value;
 
-    // Determine the start and end index of visible items
-    const visibleStart = Math.floor(scrollOffset / ITEM_HEIGHT);
-    const visibleEnd = visibleStart + VISIBLE_ITEMS;
+    // Center of the visible range
+    const centerPosition = scrollOffset + 2 * ITEM_HEIGHT;
 
-    // If the current item is outside the visible range, return no animation
-    if (index < visibleStart - 1 || index > visibleEnd + 1) {
-      return {opacity: 0};
-    }
-
-    console.log('*****************', item, visibleStart, visibleEnd, index);
-
-    // Calculate the position of the item relative to the visible area
+    // Item position
     const itemPosition = index * ITEM_HEIGHT;
-    const distanceFromVisibleStart = Math.abs(scrollOffset - itemPosition);
 
-    // Interpolate opacity, scale, and rotation based on distance from visibleStart
-    const opacity = interpolate(
-      distanceFromVisibleStart,
-      [0, 2 * ITEM_HEIGHT, ITEM_HEIGHT * 4],
-      [0.5, 1, 0.5], // Smoothed opacity transition
-      Extrapolation.CLAMP,
-    );
+    // Calculate distance from the center
+    const distanceFromCenter = Math.abs(centerPosition - itemPosition);
 
-    const scale = interpolate(
-      distanceFromVisibleStart,
-      [0, 2 * ITEM_HEIGHT, 4 * ITEM_HEIGHT],
-      [0.8, 1, 0.8], // Smoother scaling effect
-      Extrapolation.CLAMP,
-    );
-
+    // Interpolate rotation and opacity
     const rotateX = interpolate(
-      distanceFromVisibleStart,
-      [0, 2 * ITEM_HEIGHT, 4 * ITEM_HEIGHT],
-      [30, 0, 30], // More subtle rotation
+      distanceFromCenter,
+      [0, ITEM_HEIGHT * (VISIBLE_ITEMS / 2)],
+      [0, 90], // Rotate from 0° in the center to 90° at the boundaries
+      Extrapolation.CLAMP,
+    );
+
+    const opacity = interpolate(
+      distanceFromCenter,
+      [0, ITEM_HEIGHT * (VISIBLE_ITEMS / 2)],
+      [1, 0], // Fully visible at the center, fades to 0 at the boundaries
       Extrapolation.CLAMP,
     );
 
     return {
-      opacity: withTiming(opacity),
-      transform: [
-        {scale: withTiming(scale)},
-        {rotateX: withTiming(`${rotateX}deg`)},
-      ],
+      opacity,
+      transform: [{rotateX: `${rotateX}deg`}],
     };
   });
 
   return (
-    <Animated.View style={[styles.itemContainer, animatedStyle]}>
-      <Text style={styles.itemText}>{item}</Text>
-    </Animated.View>
+    <View style={styles.itemContainer}>
+      <Animated.Text style={[styles.itemText, animatedTextStyle]}>
+        {item}
+      </Animated.Text>
+    </View>
   );
+});
+
+const useScrollHandler = (sharedValue: SharedValue<number>) => {
+  return useAnimatedScrollHandler({
+    onScroll: event => {
+      sharedValue.value = event.contentOffset.y;
+    },
+  });
 };
 
 const CircularDatePicker = () => {
@@ -84,129 +75,147 @@ const CircularDatePicker = () => {
   const todayMonth = currentDate.getMonth();
   const todayYear = currentDate.getFullYear();
 
-  const days = useMemo(() => Array.from({length: 31}, (_, i) => i + 1), []);
-
+  const days = useMemo(
+    () => ['', '', ...Array.from({length: 31}, (_, i) => i + 1), '', ''],
+    [],
+  );
   const months = useMemo(
     () => [
+      '',
+      '',
       'January',
       'February',
       'March',
       'April',
       'May',
       'June',
-
       'July',
       'August',
       'September',
       'October',
       'November',
       'December',
+      '',
+      '',
     ],
     [],
   );
-
   const years = useMemo(
-    () => Array.from({length: 100}, (_, i) => todayYear - 50 + i),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    () => [
+      '',
+      '',
+      ...Array.from({length: 100}, (_, i) => todayYear - 50 + i),
+      '',
+      '',
+    ],
+    [todayYear],
   );
 
   const scrollDay = useSharedValue(todayDay * ITEM_HEIGHT);
   const scrollMonth = useSharedValue(todayMonth * ITEM_HEIGHT);
   const scrollYear = useSharedValue(50 * ITEM_HEIGHT);
 
-  const contentHeightDay = useSharedValue(ITEM_HEIGHT * days.length);
-  const contentHeightMonth = useSharedValue(ITEM_HEIGHT * months.length);
-  const contentHeightYear = useSharedValue(ITEM_HEIGHT * years.length);
+  const dayListRef = useRef<Animated.FlatList<number>>(null);
+  const monthListRef = useRef<Animated.FlatList<string>>(null);
+  const yearListRef = useRef<Animated.FlatList<number>>(null);
 
-  const dayScrollHandler = useAnimatedScrollHandler({
-    onScroll: event => {
-      scrollDay.value = event.contentOffset.y;
-    },
-  });
+  useEffect(() => {
+    const centerItem = (
+      ref: React.RefObject<Animated.FlatList<any>>,
+      index: number,
+    ) => {
+      'worklet';
+      if (ref.current) {
+        ref.current.scrollToOffset({
+          offset: (index - 1) * ITEM_HEIGHT, // Directly scroll to the target item's offset
+          animated: true,
+        });
+      }
+    };
 
-  const monthScrollHandler = useAnimatedScrollHandler({
-    onScroll: event => {
-      scrollMonth.value = event.contentOffset.y;
-    },
-  });
+    // Calculate the actual indices
+    const dayIndex = todayDay; // Add 2 to account for the two padding elements
+    const monthIndex = todayMonth + 1; // Add 2 to account for the two padding elements
+    const yearIndex = 51; // Current year is at the center of 100 years, with padding
 
-  const yearScrollHandler = useAnimatedScrollHandler({
-    onScroll: event => {
-      scrollYear.value = event.contentOffset.y;
-    },
-  });
+    console.log(dayIndex, monthIndex, yearIndex);
+
+    // setTimeout(() => {
+    centerItem(dayListRef, dayIndex);
+    centerItem(monthListRef, monthIndex);
+    centerItem(yearListRef, yearIndex);
+    // }, 5000);
+  }, [todayDay, todayMonth, todayYear]);
+
+  const dayScrollHandler = useScrollHandler(scrollDay);
+  const monthScrollHandler = useScrollHandler(scrollMonth);
+  const yearScrollHandler = useScrollHandler(scrollYear);
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Date of Birth</Text>
 
       <View style={styles.pickerContainer}>
+        <View
+          style={[
+            styles.mark,
+            {
+              top: 2 * ITEM_HEIGHT,
+              height: ITEM_HEIGHT,
+              width: '100%',
+              borderBottomWidth: 1,
+              borderTopWidth: 1,
+              marginRight: 0,
+              borderColor: '#22215B',
+            },
+          ]}
+        />
         <Animated.FlatList
+          ref={dayListRef}
           data={days}
-          keyExtractor={item => item.toString()}
+          keyExtractor={(item, index) => `${item}-${index}-day`}
           renderItem={({item, index}) => (
-            <RenderItem
-              item={item}
-              index={index}
-              scrollValue={scrollDay}
-              contentHeight={contentHeightDay}
-            />
+            <RenderItem item={item} index={index} scrollValue={scrollDay} />
           )}
-          getItemLayout={(data, index) => ({
-            length: ITEM_HEIGHT,
-            offset: ITEM_HEIGHT * index,
-            index,
-          })}
           onScroll={dayScrollHandler}
-          initialScrollIndex={todayDay - 1}
           snapToInterval={ITEM_HEIGHT}
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}
+          initialNumToRender={VISIBLE_ITEMS}
+          maxToRenderPerBatch={VISIBLE_ITEMS}
+          windowSize={days.length}
         />
+
         <Animated.FlatList
+          ref={monthListRef}
           data={months}
-          keyExtractor={item => item}
+          keyExtractor={(item, index) => `${item}-${index}-month`}
           renderItem={({item, index}) => (
-            <RenderItem
-              item={item}
-              index={index}
-              scrollValue={scrollMonth}
-              contentHeight={contentHeightMonth}
-            />
+            <RenderItem item={item} index={index} scrollValue={scrollMonth} />
           )}
-          getItemLayout={(data, index) => ({
-            length: ITEM_HEIGHT,
-            offset: ITEM_HEIGHT * index,
-            index,
-          })}
           onScroll={monthScrollHandler}
-          initialScrollIndex={todayMonth}
           snapToInterval={ITEM_HEIGHT}
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}
+          initialNumToRender={VISIBLE_ITEMS}
+          maxToRenderPerBatch={VISIBLE_ITEMS}
+          windowSize={months.length}
         />
+
         <Animated.FlatList
+          ref={yearListRef}
           data={years}
-          keyExtractor={item => item.toString()}
+          keyExtractor={(item, index) => `${item}-${index}-year`}
           renderItem={({item, index}) => (
-            <RenderItem
-              item={item}
-              index={index}
-              scrollValue={scrollYear}
-              contentHeight={contentHeightYear}
-            />
+            <RenderItem item={item} index={index} scrollValue={scrollYear} />
           )}
-          getItemLayout={(data, index) => ({
-            length: ITEM_HEIGHT,
-            offset: ITEM_HEIGHT * index,
-            index,
-          })}
           onScroll={yearScrollHandler}
-          initialScrollIndex={50}
           snapToInterval={ITEM_HEIGHT}
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}
+          initialNumToRender={VISIBLE_ITEMS}
+          maxToRenderPerBatch={VISIBLE_ITEMS}
+          windowSize={years.length}
         />
       </View>
     </View>
@@ -219,6 +228,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFF',
+  },
+  mark: {
+    position: 'absolute',
+    // borderRadius: 10,
   },
   title: {
     fontSize: 22,
@@ -238,12 +251,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     width: height / 5,
-    fontWeight: '300',
   },
   itemText: {
     fontSize: 18,
     fontWeight: 'semibold',
     color: '#333',
+  },
+  gradient: {
+    position: 'absolute',
+    width: '100%',
   },
 });
 

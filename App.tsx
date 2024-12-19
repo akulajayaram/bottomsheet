@@ -22,17 +22,17 @@ const App = () => {
           onPress={() => bottomSheetRef?.current?.close()}
         />
         <DatePicker />
-        <ReanimatedBottomsheet ref={bottomSheetRef}>
-          {/* <View style={{height: 'auto'}}>
+        {/* <ReanimatedBottomsheet ref={bottomSheetRef}>
+          <View style={{height: 'auto'}}>
           <Text>Scrollable Content</Text>
           {[...Array(14)].map((_, index) => (
             <View key={index} style={{height: 80}}>
             <Text style={styles.item}>Item {index + 1}</Text>
             </View>
             ))}
-        </View> */}
+        </View>
           <DatePicker />
-        </ReanimatedBottomsheet>
+        </ReanimatedBottomsheet> */}
       </SafeAreaProvider>
     </View>
   );
