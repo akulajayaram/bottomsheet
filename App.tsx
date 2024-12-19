@@ -6,6 +6,7 @@ import ReanimatedBottomsheet, {
 import {View, Button, StyleSheet} from 'react-native';
 import DatePicker from './src/DateTimePicker';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
+import WheelPicker from './src/wheelpicker';
 
 const App = () => {
   const bottomSheetRef = useRef<ReanimatedBottomsheetRef>(null);
@@ -21,6 +22,25 @@ const App = () => {
           title="Close BottomSheet"
           onPress={() => bottomSheetRef?.current?.close()}
         />
+        {/* <WheelPicker
+          selectedIndex={4}
+          options={[
+            'January',
+            'February',
+            'March',
+            'April',
+            'May',
+            'June',
+            'July',
+            'August',
+            'September',
+            'October',
+            'November',
+            'December',
+          ]}
+          containerStyle={{backgroundColor: 'white'}}
+          onChange={() => {}}
+        /> */}
         <DatePicker />
         {/* <ReanimatedBottomsheet ref={bottomSheetRef}>
           <View style={{height: 'auto'}}>
