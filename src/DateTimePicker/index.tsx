@@ -11,9 +11,10 @@ import Animated, {
   useDerivedValue,
 } from 'react-native-reanimated';
 import WheelPicker from '../wheelpicker';
+import TimeSelector from '../TimePicker/TimeSelector';
 
 const {height} = Dimensions.get('window');
-const ITEM_HEIGHT = 40; // Height of each item
+const ITEM_HEIGHT = 35; // Height of each item
 const VISIBLE_ITEMS = 5; // Total visible items
 
 // const RenderItem: React.FC<{
@@ -226,16 +227,24 @@ const CircularDatePicker = () => {
     // }, 5000);
   }, [todayDay, todayMonth, todayYear]);
 
-  const dayScrollHandler = useScrollHandler(scrollDay);
-  const monthScrollHandler = useScrollHandler(scrollMonth);
-  const yearScrollHandler = useScrollHandler(scrollYear);
-
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Date of Birth</Text>
 
       <View style={styles.pickerContainer}>
         <WheelPicker
+          itemTextStyle={{fontSize: 18}}
+          wheelType="left"
+          selectedIndex={1}
+          visibleRest={3}
+          options={days.map(day => day.toString())}
+          containerStyle={{backgroundColor: 'white', width: '15%'}}
+          onChange={() => {}}
+        />
+        <WheelPicker
+          itemTextStyle={{fontSize: 18}}
+          wheelType="middle"
+          visibleRest={3}
           selectedIndex={1}
           options={[
             'January',
@@ -251,87 +260,21 @@ const CircularDatePicker = () => {
             'November',
             'December',
           ]}
-          containerStyle={{backgroundColor: 'white', width: '45%'}}
+          containerStyle={{backgroundColor: 'white', width: '32%'}}
           onChange={() => {}}
         />
+
         <WheelPicker
-          selectedIndex={1}
-          options={days.map(day => day.toString())}
-          containerStyle={{backgroundColor: 'white', width: '22%'}}
-          onChange={() => {}}
-        />
-        <WheelPicker
+          itemTextStyle={{fontSize: 18}}
+          wheelType="right"
           selectedIndex={4}
+          visibleRest={3}
           options={years.map(year => year.toString())}
-          containerStyle={{backgroundColor: 'white', width: '33%'}}
+          containerStyle={{backgroundColor: 'white', width: '20%'}}
           onChange={() => {}}
         />
-        {/* <Animated.FlatList
-          ref={dayListRef}
-          data={days}
-          keyExtractor={(item, index) => `${item}-${index}-day`}
-          renderItem={({item, index}) => (
-            <RenderItem item={item} index={index} scrollValue={scrollDay} />
-          )}
-          getItemLayout={(data, index) => ({
-            length: ITEM_HEIGHT,
-            offset: ITEM_HEIGHT * index,
-            index,
-          })}
-          onScroll={dayScrollHandler}
-          snapToInterval={ITEM_HEIGHT}
-          decelerationRate="fast"
-          showsVerticalScrollIndicator={false}
-          initialNumToRender={VISIBLE_ITEMS}
-          maxToRenderPerBatch={VISIBLE_ITEMS}
-          windowSize={days.length}
-          snapToAlignment={'start'}
-        />
-
-        <Animated.FlatList
-          ref={monthListRef}
-          data={months}
-          keyExtractor={(item, index) => `${item}-${index}-month`}
-          renderItem={({item, index}) => (
-            <RenderItem item={item} index={index} scrollValue={scrollMonth} />
-          )}
-          getItemLayout={(data, index) => ({
-            length: ITEM_HEIGHT,
-            offset: ITEM_HEIGHT * index,
-            index,
-          })}
-          onScroll={monthScrollHandler}
-          snapToInterval={ITEM_HEIGHT}
-          decelerationRate="normal"
-          showsVerticalScrollIndicator={false}
-          initialNumToRender={VISIBLE_ITEMS}
-          maxToRenderPerBatch={VISIBLE_ITEMS}
-          windowSize={months.length}
-          snapToAlignment={'start'}
-        />
-
-        <Animated.FlatList
-          ref={yearListRef}
-          data={years}
-          keyExtractor={(item, index) => `${item}-${index}-year`}
-          renderItem={({item, index}) => (
-            <RenderItem item={item} index={index} scrollValue={scrollYear} />
-          )}
-          getItemLayout={(data, index) => ({
-            length: ITEM_HEIGHT,
-            offset: ITEM_HEIGHT * index,
-            index,
-          })}
-          onScroll={yearScrollHandler}
-          snapToInterval={ITEM_HEIGHT}
-          decelerationRate="normal"
-          showsVerticalScrollIndicator={false}
-          initialNumToRender={VISIBLE_ITEMS}
-          maxToRenderPerBatch={VISIBLE_ITEMS}
-          windowSize={years.length}
-          snapToAlignment={'start'}
-        /> */}
       </View>
+      <TimeSelector />
     </View>
   );
 };
@@ -354,7 +297,7 @@ const styles = StyleSheet.create({
   },
   pickerContainer: {
     flexDirection: 'row',
-    height: ITEM_HEIGHT * VISIBLE_ITEMS,
+    height: ITEM_HEIGHT * 9,
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: '#DDD',

@@ -30,6 +30,7 @@ interface Props {
   visibleRest?: number;
   decelerationRate?: 'normal' | 'fast' | number;
   flatListProps?: Omit<FlatListProps<string | null>, 'data' | 'renderItem'>;
+  wheelType: string;
 }
 
 const WheelPicker: React.FC<Props> = ({
@@ -48,6 +49,7 @@ const WheelPicker: React.FC<Props> = ({
   decelerationRate = 'fast',
   containerProps = {},
   flatListProps = {},
+  wheelType = 'middle',
 }) => {
   const flatListRef = useRef<FlatList>(null);
   const [scrollY] = useState(new Animated.Value(0));
@@ -162,6 +164,7 @@ const WheelPicker: React.FC<Props> = ({
             rotationFunction={rotationFunction}
             opacityFunction={opacityFunction}
             visibleRest={visibleRest}
+            wheelType={wheelType}
           />
         )}
       />

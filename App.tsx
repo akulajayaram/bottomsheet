@@ -7,6 +7,7 @@ import {View, Button, StyleSheet} from 'react-native';
 import DatePicker from './src/DateTimePicker';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import WheelPicker from './src/wheelpicker';
+import TimeSelector from './src/TimePicker/TimeSelector';
 
 const App = () => {
   const bottomSheetRef = useRef<ReanimatedBottomsheetRef>(null);
@@ -42,17 +43,9 @@ const App = () => {
           onChange={() => {}}
         /> */}
         <DatePicker />
-        {/* <ReanimatedBottomsheet ref={bottomSheetRef}>
-          <View style={{height: 'auto'}}>
-          <Text>Scrollable Content</Text>
-          {[...Array(14)].map((_, index) => (
-            <View key={index} style={{height: 80}}>
-            <Text style={styles.item}>Item {index + 1}</Text>
-            </View>
-            ))}
-        </View>
+        <ReanimatedBottomsheet ref={bottomSheetRef}>
           <DatePicker />
-        </ReanimatedBottomsheet> */}
+        </ReanimatedBottomsheet>
       </SafeAreaProvider>
     </View>
   );

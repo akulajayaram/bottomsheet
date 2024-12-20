@@ -7,8 +7,12 @@ export default StyleSheet.create({
   selectedIndicator: {
     position: 'absolute',
     width: '100%',
-    backgroundColor: 'hsl(200, 8%, 94%)',
+    // backgroundColor: 'hsl(200, 8%, 94%)',
     // borderRadius: 5,
+    // borderWidth: 1,
+    borderColor: 'black',
+    borderTopWidth: 1,
+    borderBottomWidth:1,
     top: '50%',
   },
   scrollView: {

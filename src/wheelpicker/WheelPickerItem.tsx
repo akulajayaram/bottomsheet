@@ -13,6 +13,7 @@ interface ItemProps {
   rotationFunction: (x: number) => number;
   opacityFunction: (x: number) => number;
   scaleFunction: (x: number) => number;
+  wheelType: string;
 }
 
 const WheelPickerItem: React.FC<ItemProps> = ({
@@ -21,18 +22,50 @@ const WheelPickerItem: React.FC<ItemProps> = ({
   height,
   option,
   index,
-  visibleRest,
+  visibleRest = 3,
   currentScrollIndex,
   opacityFunction,
   rotationFunction,
   scaleFunction,
+  wheelType,
 }) => {
   const relativeScrollIndex = Animated.subtract(index, currentScrollIndex);
+
+  const translateX = relativeScrollIndex.interpolate({
+    inputRange: (() => {
+      const range = [0];
+
+      for (let i = 1; i <= 3 + 1; i++) {
+        range.unshift(-i);
+
+        range.push(i);
+      }
+      console.log(range, 'input');
+
+      return range;
+    })(),
+
+    outputRange: (() => {
+      // const range = [-1];
+      const range = [wheelType === 'right' ? -1 : wheelType === 'left' ? 1 : 0];
+
+      const offset = wheelType === 'right' ? 2 : wheelType === 'left' ? -2 : 0; // Adjust this value for more or less 3D effect
+
+      for (let i = 1; i <= 3 + 1; i++) {
+        range.unshift(-offset * i);
+
+        range.push(-offset * i);
+      }
+      console.log(range, 'output', wheelType);
+
+      return range;
+    })(),
+  });
 
   const translateY = relativeScrollIndex.interpolate({
     inputRange: (() => {
       const range = [0];
-      for (let i = 1; i <= visibleRest + 1; i++) {
+      for (let i = 1; i <= 3 + 1; i++) {
         range.unshift(-i);
         range.push(i);
       }
@@ -40,7 +73,7 @@ const WheelPickerItem: React.FC<ItemProps> = ({
     })(),
     outputRange: (() => {
       const range = [0];
-      for (let i = 1; i <= visibleRest + 1; i++) {
+      for (let i = 1; i <= 3 + 1; i++) {
         let y =
           (height / 2) * (1 - Math.sin(Math.PI / 2 - rotationFunction(i)));
         for (let j = 1; j < i; j++) {
@@ -56,19 +89,14 @@ const WheelPickerItem: React.FC<ItemProps> = ({
   const opacity = relativeScrollIndex.interpolate({
     inputRange: (() => {
       const range = [0];
-      for (let i = 1; i <= visibleRest + 1; i++) {
+      for (let i = 1; i <= 3 + 1; i++) {
         range.unshift(-i);
         range.push(i);
       }
       return range;
     })(),
     outputRange: (() => {
-      const range = [1];
-      for (let x = 1; x <= visibleRest + 1; x++) {
-        const y = opacityFunction(x);
-        range.unshift(y);
-        range.push(y);
-      }
+      const range = [0.2, 0.4, 0.6, 0.7, 1, 0.7, 0.6, 0.4, 0.2];
       return range;
     })(),
   });
@@ -76,19 +104,14 @@ const WheelPickerItem: React.FC<ItemProps> = ({
   const scale = relativeScrollIndex.interpolate({
     inputRange: (() => {
       const range = [0];
-      for (let i = 1; i <= visibleRest + 1; i++) {
+      for (let i = 1; i <= 3 + 1; i++) {
         range.unshift(-i);
         range.push(i);
       }
       return range;
     })(),
     outputRange: (() => {
-      const range = [1.0];
-      for (let x = 1; x <= visibleRest + 1; x++) {
-        const y = scaleFunction(x);
-        range.unshift(y);
-        range.push(y);
-      }
+      const range = [0.9, 0.9, 0.9, 0.95, 0.95, 0.95, 0.9, 0.9, 0.9];
       return range;
     })(),
   });
@@ -96,19 +119,60 @@ const WheelPickerItem: React.FC<ItemProps> = ({
   const rotateX = relativeScrollIndex.interpolate({
     inputRange: (() => {
       const range = [0];
-      for (let i = 1; i <= visibleRest + 1; i++) {
+      for (let i = 1; i <= 3 + 1; i++) {
         range.unshift(-i);
         range.push(i);
       }
       return range;
     })(),
     outputRange: (() => {
-      const range = ['0deg'];
-      for (let x = 1; x <= visibleRest + 1; x++) {
-        const y = rotationFunction(x);
-        range.unshift(`${y}deg`);
-        range.push(`${y}deg`);
+      const range = [
+        '-90deg',
+        '-70deg',
+        '-50deg',
+        '-40deg',
+        '0deg',
+        '40deg',
+        '50deg',
+        '70deg',
+        '90deg',
+      ];
+      return range;
+    })(),
+  });
+
+  const rotateY = relativeScrollIndex.interpolate({
+    inputRange: (() => {
+      const range = [0];
+      for (let i = 1; i <= 3 + 1; i++) {
+        range.unshift(-i);
+        range.push(i);
       }
+      return range;
+    })(),
+    outputRange: (() => {
+      const range = [
+        '0deg',
+        '0deg',
+        '0deg',
+        '0deg',
+        '0deg',
+        '0deg',
+        '0deg',
+        '0deg',
+        '0deg',
+      ];
+      console.log(
+        range.map(deg =>
+          wheelType === 'right'
+            ? deg
+            : wheelType === 'left'
+            ? `-${deg}`
+            : '0deg',
+        ),
+        '---------------',
+      );
+
       return range;
     })(),
   });
@@ -118,7 +182,17 @@ const WheelPickerItem: React.FC<ItemProps> = ({
       style={[
         styles.option,
         style,
-        {height, opacity, transform: [{translateY}, {rotateX}, {scale}]},
+        {
+          height,
+          opacity,
+          transform: [
+            {translateY},
+            {rotateX},
+            {translateX},
+            {rotateY},
+            {scale},
+          ],
+        },
       ]}>
       <Text style={textStyle}>{option}</Text>
     </Animated.View>
