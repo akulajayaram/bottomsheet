@@ -297,9 +297,10 @@ const styles = StyleSheet.create({
   },
   pickerContainer: {
     flexDirection: 'row',
-    height: ITEM_HEIGHT * 9,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
+    height: ITEM_HEIGHT * 6,
+    alignItems: 'center',
+    // borderTopWidth: 1,
+    // borderBottomWidth: 1,
     borderColor: '#DDD',
     overflow: 'hidden',
   },

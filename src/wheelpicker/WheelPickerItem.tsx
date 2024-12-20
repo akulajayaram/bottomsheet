@@ -49,7 +49,8 @@ const WheelPickerItem: React.FC<ItemProps> = ({
       // const range = [-1];
       const range = [wheelType === 'right' ? -1 : wheelType === 'left' ? 1 : 0];
 
-      const offset = wheelType === 'right' ? 2 : wheelType === 'left' ? -2 : 0; // Adjust this value for more or less 3D effect
+      const offset =
+        wheelType === 'right' ? 1.5 : wheelType === 'left' ? -1.5 : 0; // Adjust this value for more or less 3D effect
 
       for (let i = 1; i <= 3 + 1; i++) {
         range.unshift(-offset * i);
@@ -96,7 +97,7 @@ const WheelPickerItem: React.FC<ItemProps> = ({
       return range;
     })(),
     outputRange: (() => {
-      const range = [0.2, 0.4, 0.6, 0.7, 1, 0.7, 0.6, 0.4, 0.2];
+      const range = [0.2, 0.2, 0.4, 0.6, 1, 0.6, 0.4, 0.2, 0.2];
       return range;
     })(),
   });
@@ -127,15 +128,15 @@ const WheelPickerItem: React.FC<ItemProps> = ({
     })(),
     outputRange: (() => {
       const range = [
-        '-90deg',
-        '-70deg',
-        '-50deg',
-        '-40deg',
+        '-75deg',
+        '-55deg',
+        '-30deg',
+        '-15deg',
         '0deg',
-        '40deg',
-        '50deg',
-        '70deg',
-        '90deg',
+        '15deg',
+        '35deg',
+        '55deg',
+        '75deg',
       ];
       return range;
     })(),
@@ -176,7 +177,14 @@ const WheelPickerItem: React.FC<ItemProps> = ({
       return range;
     })(),
   });
+  const scaleY = relativeScrollIndex.interpolate({
+    inputRange: [-4, -3, -2, -1, 0, 1, 2, 3, 4],
 
+    outputRange: [0.8, 0.85, 0.9, 0.9, 1, 0.9, 0.9, 0.85, 0.8],
+
+    extrapolate: 'clamp', // Prevents the height from going below the minimum value
+  });
+  const scaleX = 1;
   return (
     <Animated.View
       style={[
@@ -190,7 +198,9 @@ const WheelPickerItem: React.FC<ItemProps> = ({
             {rotateX},
             {translateX},
             {rotateY},
-            {scale},
+            {scaleX},
+            {scaleY},
+            // {scale},
           ],
         },
       ]}>
